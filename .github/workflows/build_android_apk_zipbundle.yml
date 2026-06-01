@@ -1,0 +1,58 @@
+name: build-android-apk (zip bundle)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3 python3-pip python3-dev git \
+            openjdk-17-jdk \
+            unzip zip \
+            autoconf automake libtool pkg-config \
+            libffi-dev libssl-dev zlib1g-dev \
+            libsqlite3-dev \
+            libncurses5-dev libncursesw5-dev libtinfo5 \
+            cmake
+
+      - name: Setup Python deps
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install buildozer cython setuptools wheel
+
+      - name: Cache buildozer
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            ~/.gradle
+          key: buildozer-zip-${{ runner.os }}-${{ hashFiles('kivy_app_bundle.zip', '.github/workflows/build_android_apk_zipbundle.yml') }}
+
+      - name: Unpack Kivy bundle
+        run: |
+          if [ ! -f "kivy_app_bundle.zip" ]; then
+            echo "Missing kivy_app_bundle.zip in repo root" >&2
+            exit 1
+          fi
+          rm -rf kivy_app
+          unzip -q kivy_app_bundle.zip
+          test -f kivy_app/buildozer.spec
+
+      - name: Build debug APK
+        working-directory: kivy_app
+        run: |
+          buildozer -v android debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zhiyue-companion-apk
+          path: kivy_app/bin/*.apk
+
