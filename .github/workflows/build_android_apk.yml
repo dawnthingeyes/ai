@@ -1,0 +1,59 @@
+name: build-android-apk
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack repo bundle
+        run: |
+          test -f companion_repo_bundle.zip
+          unzip -o companion_repo_bundle.zip -d .
+          ls -la
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3 python3-pip python3-dev git zip unzip \
+            autoconf automake libtool pkg-config \
+            libffi-dev libssl-dev zlib1g-dev \
+            libsqlite3-dev libncurses5-dev libncursesw5-dev libtinfo6 \
+            cmake
+
+      - name: Setup Python deps
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install buildozer cython setuptools wheel
+
+      - name: Cache buildozer
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            ~/.gradle
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec', 'main.py', 'service.py', 'app_core.py') }}
+
+      - name: Smoke test
+        run: |
+          python3 smoke_test_service.py
+
+      - name: Build debug APK
+        run: |
+          buildozer -v android debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-apk
+          path: bin/*.apk
