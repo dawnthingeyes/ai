@@ -12,7 +12,20 @@ jobs:
       - name: Unpack repo bundle
         run: |
           test -f companion_repo_bundle.zip
-          unzip -o companion_repo_bundle.zip -d .
+          python3 - <<'PY'
+          import pathlib
+          import zipfile
+
+          bundle = pathlib.Path("companion_repo_bundle.zip")
+          with zipfile.ZipFile(bundle, "r") as zf:
+              for info in zf.infolist():
+                  name = info.filename.replace("\\", "/")
+                  if not name or name.endswith("/"):
+                      continue
+                  target = pathlib.Path(name)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(zf.read(info))
+          PY
           ls -la
 
       - name: Setup Java 17
